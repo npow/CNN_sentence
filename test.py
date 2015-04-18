@@ -48,8 +48,8 @@ def train_conv_net(datasets,
         input_layers.append(l_in)
 
     l_hidden1 = lasagne.layers.ConcatLayer(conv_layers)
-    l_hidden2 = lasagne.layers.DenseLayer(l_hidden1, num_units=hidden_units[1], nonlinearity=lasagne.nonlinearities.softmax)
-    l_out = lasagne.layers.DropoutLayer(l_hidden2, p=0.5)
+    l_hidden1 = lasagne.layers.DropoutLayer(l_hidden1, p=0.5)
+    l_out = lasagne.layers.DenseLayer(l_hidden1, num_units=hidden_units[1], nonlinearity=lasagne.nonlinearities.softmax)
 
     index = T.lscalar()
     x = T.imatrix('x')   
@@ -88,15 +88,14 @@ def train_conv_net(datasets,
     n_val_batches = n_batches - n_train_batches
 
     pred = T.argmax(l_out.get_output((layer0_input), deterministic=True), axis=1)    
-    #TODO
-    accuracy = T.mean(T.eq(pred, y), dtype=theano.config.floatX)
-    val_model = theano.function([index], accuracy,
+    errors = T.mean(T.neq(pred, y), dtype=theano.config.floatX)
+    val_model = theano.function([index], errors,
          givens={
             x: val_set_x[index * batch_size: (index + 1) * batch_size],
             y: val_set_y[index * batch_size: (index + 1) * batch_size]})
             
     #compile theano functions to get train/val/test errors
-    test_model = theano.function([index], accuracy,
+    test_model = theano.function([index], errors,
              givens={
                 x: train_set_x[index * batch_size: (index + 1) * batch_size],
                 y: train_set_y[index * batch_size: (index + 1) * batch_size]})               
@@ -104,11 +103,8 @@ def train_conv_net(datasets,
           givens={
             x: train_set_x[index*batch_size:(index+1)*batch_size],
             y: train_set_y[index*batch_size:(index+1)*batch_size]})     
-    test_pred_layers = []
-    test_size = test_set_x.shape[0]
-    test_layer0_input = Words[T.cast(x.flatten(),dtype="int32")].reshape((test_size,1,x.shape[1],Words.shape[1]))
-    test_y_pred = T.argmax(l_out.get_output((test_layer0_input), deterministic=True), axis=1)
-    test_error = T.mean(T.neq(test_y_pred, y))
+
+    test_error = T.mean(T.neq(pred, y))
     test_model_all = theano.function([x,y], test_error)   
     
     #start training over mini-batches
@@ -196,8 +192,8 @@ if __name__=="__main__":
     x = cPickle.load(open("mr.p","rb"))
     revs, W, W2, word_idx_map, vocab = x[0], x[1].astype(theano.config.floatX), x[2].astype(theano.config.floatX), x[3], x[4]
     print "data loaded!"
-    mode= sys.argv[1]
-    word_vectors = sys.argv[2]    
+    mode= "-static"#sys.argv[1]
+    word_vectors = "-word2vec"#sys.argv[2]
     if mode=="-nonstatic":
         print "model architecture: CNN-non-static"
         non_static=True
